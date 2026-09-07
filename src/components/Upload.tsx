@@ -49,38 +49,50 @@ export function Upload({ onReady }: Props) {
     }
   }
 
-  if (busy) {
-    return (
-      <div className="upload">
+  return (
+    <div className="upload">
+      <header className="intro">
+        {/* The one red letter is the same idea the reader runs on, shown
+            rather than described. */}
+        <h1 className="intro-title">
+          Speed Re<span className="intro-pivot">a</span>der
+        </h1>
+        <p className="intro-lede">One word at a time, at a pace you set.</p>
+        <p className="intro-body">
+          Ordinary reading spends much of its effort just moving your eyes —
+          hopping from word to word, slipping back over lines you have already
+          read. Here the words come to you instead, each one placed so the
+          letter your eye lands on sits in the same spot every time. With
+          nothing to track, the effort goes into reading rather than looking.
+        </p>
+      </header>
+
+      {busy ? (
         <div className="parsing">
           <div className="parsing-bar">
             <div style={{ transform: `scaleX(${progress})` }} />
           </div>
           <p className="muted">reading {Math.round(progress * 100)}%</p>
         </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="upload">
-      <div
-        className={`drop ${dragging ? 'drop-active' : ''}`}
-        onClick={() => inputRef.current?.click()}
-        onDragOver={(e) => {
-          e.preventDefault()
-          setDragging(true)
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault()
-          setDragging(false)
-          handleFile(e.dataTransfer.files[0])
-        }}
-      >
-        <p className="drop-title">Drop a PDF</p>
-        <p className="muted">or click to choose one</p>
-      </div>
+      ) : (
+        <div
+          className={`drop ${dragging ? 'drop-active' : ''}`}
+          onClick={() => inputRef.current?.click()}
+          onDragOver={(e) => {
+            e.preventDefault()
+            setDragging(true)
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault()
+            setDragging(false)
+            handleFile(e.dataTransfer.files[0])
+          }}
+        >
+          <p className="drop-title">Drop a PDF</p>
+          <p className="muted">or click to choose one</p>
+        </div>
+      )}
 
       <input
         ref={inputRef}
@@ -93,7 +105,8 @@ export function Upload({ onReady }: Props) {
       {error && <p className="error">{error}</p>}
 
       <p className="footnote">
-        Parsed in your browser. Nothing is uploaded anywhere.
+        Your PDF is read here in the browser and never uploaded. Books stay on
+        this device, and the reader opens past the title and copyright pages.
       </p>
     </div>
   )

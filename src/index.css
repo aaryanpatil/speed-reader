@@ -75,14 +75,49 @@ body {
 .upload {
   display: grid;
   justify-items: center;
-  gap: 1.5rem;
-  padding: 2rem;
+  gap: 1.75rem;
+  padding: 2.5rem 1.5rem;
   animation: rise var(--t) both;
+}
+
+/* --- Introduction --- */
+
+.intro {
+  display: grid;
+  justify-items: center;
+  gap: 0.65rem;
+  /* Held to a comfortable measure rather than the full window, so the
+     paragraph doesn't run to forty words a line on a wide screen. */
+  max-width: 32rem;
+  text-align: center;
+}
+
+.intro-title {
+  font-size: clamp(1.5rem, 5vw, 1.875rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* The same accent the pivot letter uses in the reader. */
+.intro-pivot {
+  color: var(--accent);
+}
+
+.intro-lede {
+  font-size: 1rem;
+  color: var(--fg);
+}
+
+.intro-body {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--muted);
+  text-wrap: pretty;
 }
 
 .drop {
   width: min(80vw, 420px);
-  padding: 4rem 2rem;
+  padding: 3rem 2rem;
   display: grid;
   justify-items: center;
   gap: 0.4rem;
@@ -136,8 +171,12 @@ body {
 }
 
 .footnote {
+  max-width: 26rem;
   color: var(--muted);
   font-size: 0.75rem;
+  line-height: 1.55;
+  text-align: center;
+  text-wrap: pretty;
 }
 
 /* --- Reader ---------------------------------------------------------- */
