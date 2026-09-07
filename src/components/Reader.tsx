@@ -10,7 +10,7 @@ import {
   tokenize,
   type TimingOptions,
 } from '../lib/words'
-import { TimingPanel } from './TimingPanel'
+import { Settings } from './Settings'
 import type { Book } from '../lib/storage'
 
 /** How far you drag to move one word. Smaller = twitchier scrubbing. */
@@ -70,6 +70,7 @@ export function Reader({ book, onExit }: Props) {
   const [scrubbing, setScrubbing] = useState(false)
   const [timing, setTiming] = useState<TimingOptions>(DEFAULT_TIMING)
   const [rhythm, setRhythm] = useState(true)
+  const [settings, setSettings] = useState(false)
 
   // Reading each word is the expensive half and depends only on the book.
   const shapes = useMemo(() => analyseWords(words), [words])
@@ -285,7 +286,9 @@ export function Reader({ book, onExit }: Props) {
       {/* The whole stage is the play/pause and seek target, so no control
           competes with the word for your attention while you're reading. */}
       <div
-        className={`stage ${scrubbing ? 'stage-scrubbing' : ''}`}
+        className={`stage ${scrubbing ? 'stage-scrubbing' : ''} ${
+          settings ? 'stage-behind' : ''
+        }`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -308,37 +311,39 @@ export function Reader({ book, onExit }: Props) {
         <ContextLine words={words} index={index} visible={!playing} />
       </div>
 
-      <div className={`chrome ${playing ? 'chrome-dim' : ''}`}>
-        {/* Rate sits nearest the word, being the control reached for most;
-            the timing panel opens underneath it. */}
-        <div className="controls">
-          <input
-            type="range"
-            min={100}
-            max={1000}
-            step={25}
-            value={wpm}
-            onChange={(e) => setWpm(Number(e.target.value))}
-            aria-label="Words per minute"
-          />
-          <span className="wpm">{wpm} wpm</span>
-        </div>
+      {/* Only while stopped, like everything else that isn't the word.
+          Opening it doesn't disturb playback: it is only reachable from a
+          pause, and closing returns you to that same pause. */}
+      <button
+        className={`gear ${playing ? 'gear-hidden' : ''}`}
+        onClick={() => setSettings(true)}
+        aria-label="Settings"
+        tabIndex={playing ? -1 : 0}
+      >
+        <svg viewBox="0 0 16 16" width="17" height="17" aria-hidden="true">
+          <line x1="1.5" y1="5" x2="14.5" y2="5" />
+          <line x1="1.5" y1="11" x2="14.5" y2="11" />
+          <circle cx="5.5" cy="5" r="2.1" />
+          <circle cx="10.5" cy="11" r="2.1" />
+        </svg>
+      </button>
 
-        {/* Always mounted, faded out while reading. Unmounting it would
-            shrink the chrome and shift the word down mid-sentence, which
-            is the one thing that must never move. */}
-        <TimingPanel
+      {settings && (
+        <Settings
+          wpm={wpm}
+          onWpmChange={setWpm}
           timing={timing}
-          onChange={setTiming}
+          onTimingChange={setTiming}
           rhythm={rhythm}
           onRhythmChange={setRhythm}
           onReset={() => {
             setTiming(DEFAULT_TIMING)
             setRhythm(true)
           }}
-          hidden={playing}
+          onClose={() => setSettings(false)}
         />
-      </div>
+      )}
+
     </div>
   )
 }

@@ -13,6 +13,7 @@
   --on-fg: #123021;
   --off: #4a4a48; /* dark grey: rhythm off */
   --off-fg: #cfcfca;
+  --scrim: rgba(251, 251, 250, 0.55);
 
   /* "Brisk": fast enough to feel immediate, slow enough to read as motion. */
   --t: 140ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -27,6 +28,7 @@
     --accent: #ff6b5e;
     --on: #8fcaa4;
     --on-fg: #0e2a1b;
+    --scrim: rgba(10, 10, 10, 0.5);
   }
 }
 
@@ -192,6 +194,7 @@ body {
      touch drag scrolls the page instead of seeking, and the pointer
      events stop arriving partway through the gesture. */
   touch-action: none;
+  transition: filter var(--t), opacity var(--t);
 }
 
 .stage-scrubbing {
@@ -317,58 +320,133 @@ body {
   color: var(--fg);
 }
 
-/* The controls and the timing panel move as one block, so opening the
-   panel pushes nothing around and dimming applies to both together. */
-.chrome {
+/* --- Settings sheet ---------------------------------------------------
+
+   The controls used to sit in a strip along the bottom. That works in
+   portrait and falls apart in landscape, where a phone has a few hundred
+   pixels of height and a permanent strip plus a centred word cannot both
+   fit. Taking them out of the flow entirely means the word keeps the
+   middle of the screen at every size, and the controls get as much room
+   as they need when they are actually wanted.
+   --------------------------------------------------------------------- */
+
+/* Mirrors .exit in the opposite corner. */
+.gear {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  top: 1.25rem;
+  right: 1.25rem;
   display: grid;
-  justify-items: center;
-  gap: 0.9rem;
-  padding: 1.25rem 2rem 2rem;
-  transition: opacity var(--t);
+  place-items: center;
+  padding: 0.4rem;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity var(--t), color var(--t);
 }
 
-/* Full strength whenever you're stopped — that is when these are read.
-   Only reading dims them, and hovering brings them straight back. */
-.chrome-dim {
-  opacity: 0.3;
-}
-
-.chrome-dim:hover,
-.chrome:focus-within {
+.gear:hover {
   opacity: 1;
+  color: var(--fg);
 }
 
-/* --- Timing panel --- */
-
-.tuning {
-  display: grid;
-  gap: 0.55rem;
-  width: min(90vw, 370px);
-  padding: 1rem 1.1rem 1.1rem;
-  /* Opaque, so nothing shows through from behind it. */
-  background: var(--bg);
-  border: 1px solid var(--rule);
-  border-radius: 10px;
-  transition: opacity var(--t);
+.gear svg {
+  stroke: currentColor;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  fill: none;
 }
 
-/* Withdrawn while reading, the same way the hint is — faded rather than
-   removed, so the layout underneath the word never changes. */
-.tuning-hidden {
+/* Filled with the page colour so the line appears to pass behind each
+   handle rather than through it. */
+.gear circle {
+  fill: var(--bg);
+}
+
+.gear-hidden {
   opacity: 0;
   pointer-events: none;
+}
+
+/* The reader withdraws rather than disappearing, so you keep your place
+   in view while you adjust how it reads. */
+.stage-behind {
+  filter: blur(7px);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: var(--scrim);
+  animation: fade var(--t) both;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Centred, so it opens exactly where the word was. */
+.sheet {
+  display: grid;
+  gap: 0.75rem;
+  width: min(94vw, 400px);
+  /* Landscape on a phone leaves very little height; scroll inside the
+     sheet rather than letting it run off the screen. */
+  max-height: 88dvh;
+  overflow-y: auto;
+  padding: 1.1rem 1.2rem 1.25rem;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  animation: rise var(--t) both;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sheet-title {
+  font-size: 0.9375rem;
+  color: var(--fg);
+}
+
+.sheet-close {
+  background: none;
+  border: 0;
+  padding: 0 0.2rem;
+  font: inherit;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--t);
+}
+
+.sheet-close:hover {
+  color: var(--fg);
+}
+
+.sheet-rule {
+  height: 1px;
+  background: var(--rule);
+  margin: 0.15rem 0 0.1rem;
 }
 
 .tuning-head {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding-bottom: 0.55rem;
-  border-bottom: 1px solid var(--rule);
 }
 
 .tuning-title {
@@ -432,6 +510,7 @@ body {
 
 .knob input[type='range'] {
   width: 100%;
+  min-width: 0;
 }
 
 .knob input[type='range']:disabled {
@@ -448,19 +527,6 @@ body {
 
 .knob input[type='range']:disabled ~ .knob-value {
   color: var(--muted);
-}
-
-.controls {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-}
-
-.wpm {
-  color: var(--muted);
-  font-size: 0.8125rem;
-  font-variant-numeric: tabular-nums;
-  min-width: 5.5ch;
 }
 
 input[type='range'] {
