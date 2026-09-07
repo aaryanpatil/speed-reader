@@ -44,7 +44,12 @@ body {
 }
 
 .app {
+  /* dvh, not vh: on a phone `100vh` is measured against the viewport with
+     the address bar *collapsed*, so a full-height layout gets cut off
+     until you scroll. dvh tracks the bar as it comes and goes. The vh
+     line stays first as a fallback for browsers without dvh. */
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
 }
@@ -136,8 +141,11 @@ body {
 
 .reader {
   position: relative;
-  width: 100vw;
+  /* 100% rather than 100vw, which counts the scrollbar's width and can
+     push the page sideways. */
+  width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-rows: 1fr auto;
   place-items: center;
