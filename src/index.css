@@ -172,6 +172,87 @@ body {
   font-weight: 500;
 }
 
+/* --- Paste --- */
+
+/* Matched to the drop zone's width so the page doesn't jump when you
+   switch between them. */
+.paste {
+  display: grid;
+  gap: 0.6rem;
+  width: min(80vw, 420px);
+}
+
+.paste-box {
+  width: 100%;
+  height: 9.5rem;
+  padding: 0.85rem 0.95rem;
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--fg);
+  background: transparent;
+  border: 1px dashed var(--rule);
+  border-radius: 12px;
+  resize: vertical;
+  transition: border-color var(--t);
+}
+
+.paste-box::placeholder {
+  color: var(--muted);
+}
+
+.paste-box:focus {
+  outline: none;
+  border-style: solid;
+  border-color: var(--fg);
+}
+
+.paste-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 1.9rem;
+  font-size: 0.75rem;
+}
+
+.button {
+  padding: 0.4rem 1.1rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--bg);
+  background: var(--fg);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: opacity var(--t);
+}
+
+.button:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.button:not(:disabled):hover {
+  opacity: 0.82;
+}
+
+/* A word that behaves like a link, for switching between the two ways in. */
+.link {
+  padding: 0;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: color var(--t);
+}
+
+.link:hover {
+  color: var(--fg);
+}
+
 .parsing {
   display: grid;
   justify-items: center;

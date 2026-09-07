@@ -1,6 +1,7 @@
 # Speed Reader
 
-Upload a PDF, read it one word at a time (RSVP) at a speed you set.
+Upload a PDF or paste any text, then read it one word at a time (RSVP) at
+a speed you set.
 
 Everything happens in your browser. The PDF is never uploaded anywhere,
 and no server is involved.
@@ -18,6 +19,13 @@ npm run dev
 straight out of the file locally — no AI, no API, no cost. Scanned PDFs
 (images of pages) have no text layer; those are detected and rejected for
 now, and are the one case where OCR would be needed later.
+
+**Pasted text.** Anything pasted goes through the same tidying a PDF
+gets, since text copied out of one carries the same broken line wraps and
+split words. One paste is capped at 100,000 characters — about 20,000
+words, or an hour of reading — which covers any article or chapter while
+keeping the text box responsive. A whole book belongs in the PDF path,
+where it never has to sit in a text field.
 
 **Storage.** The extracted text goes into IndexedDB via `idb-keyval`. The
 PDF itself is discarded after parsing. IndexedDB rather than
