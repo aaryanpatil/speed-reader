@@ -31,6 +31,12 @@ holding that point still and sliding the word around it, your eye never
 has to move — which is what makes reading at speed possible rather than
 exhausting.
 
+**Seeking.** Tap the stage to start or stop. Pausing reveals a line of
+surrounding text so you can see where you are. Press and drag to seek —
+you're dragging the text itself, so pulling right walks you backward.
+Hold near either edge and it keeps going on its own, accelerating the
+further out you hold.
+
 ## Layout
 
 ```

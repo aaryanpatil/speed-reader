@@ -1,11 +1,50 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Word } from './Word'
+import { ContextLine } from './ContextLine'
 import { msPerWord, tokenize } from '../lib/words'
 import type { Book } from '../lib/storage'
+
+/** How far you drag to move one word. Smaller = twitchier scrubbing. */
+const PX_PER_WORD = 22
+
+/** Movement under this is a click, not a drag. Absorbs hand tremor. */
+const DRAG_SLOP = 4
+
+/**
+ * How far out from the centre the edge acceleration starts, as a fraction
+ * of the distance from centre to edge. Everything inside this is a dead
+ * zone where only your hand moves the text — otherwise the page would
+ * creep whenever you tried to hold still.
+ */
+const EDGE_DEAD_ZONE = 0.25
+
+/** Words per second at the very edge of the screen. */
+const EDGE_MAX_WPS = 90
+
+/**
+ * How long you must hold before edge acceleration engages. Without this a
+ * quick tap near the edge would fly off through the text instead of
+ * pausing, since a tap is also a press that happens to be near an edge.
+ */
+const HOLD_DELAY_MS = 200
 
 type Props = {
   book: Book
   onExit: () => void
+}
+
+type Drag = {
+  startX: number
+  startIndex: number
+  pointerX: number
+  /** Centre of the stage and half its width, for the edge ramp. */
+  centre: number
+  half: number
+  /** Fractional words accumulated by edge acceleration. */
+  offset: number
+  moved: boolean
+  startTime: number
+  lastFrame: number
 }
 
 export function Reader({ book, onExit }: Props) {
@@ -16,6 +55,7 @@ export function Reader({ book, onExit }: Props) {
   const [index, setIndex] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [wpm, setWpm] = useState(300)
+  const [scrubbing, setScrubbing] = useState(false)
 
   // The animation loop below is set up once and then runs for a while, so
   // it can't read `wpm` directly — it would capture whatever the value was
@@ -60,6 +100,138 @@ export function Reader({ book, onExit }: Props) {
     setPlaying((p) => !p)
   }
 
+  /* --- Seeking -------------------------------------------------------
+     Two things move the text at once:
+
+       1. Your hand.  Drag distance maps straight to words, so near the
+          centre you have exact, reversible control.
+       2. The edges.  Past the dead zone, the text keeps moving on its own
+          for as long as you hold there, faster the further out you go.
+          This is what lets you cross a chapter without a dozen swipes.
+
+     They simply add together, and because the ramp starts at zero the
+     handover between them is seamless — there's no point where control
+     jumps from one to the other.
+
+     A press also still means play/pause. We can't know which it is at
+     pointerdown, so nothing is decided there: we record the press and see
+     whether it turns into movement. `drag` holds that pending state in a
+     ref rather than state, since changing it mid-gesture shouldn't cause
+     a re-render.
+     ------------------------------------------------------------------- */
+  const drag = useRef<Drag | null>(null)
+  const seekFrame = useRef(0)
+
+  /** Words per second contributed by holding near an edge. */
+  function edgeVelocity(d: Drag): number {
+    // -1 at the left edge, 0 at the centre, +1 at the right edge.
+    const from = (d.pointerX - d.centre) / d.half
+    const magnitude = Math.abs(from)
+    if (magnitude < EDGE_DEAD_ZONE) return 0
+
+    // Renormalise so the ramp starts at 0 right where the dead zone ends,
+    // then square it: gentle as you cross the threshold, urgent at the
+    // very edge. A linear ramp feels like it lurches on.
+    const t = (magnitude - EDGE_DEAD_ZONE) / (1 - EDGE_DEAD_ZONE)
+    const speed = EDGE_MAX_WPS * t * t
+
+    // Negative on the right, matching the drag: pushing right walks you
+    // back through the text.
+    return from > 0 ? -speed : speed
+  }
+
+  /** One frame of seeking, while a pointer is held down. */
+  function seekTick(now: number) {
+    const d = drag.current
+    if (!d) return
+
+    const dt = (now - d.lastFrame) / 1000
+    d.lastFrame = now
+
+    // Has this press become a gesture yet?
+    if (!d.moved && Math.abs(d.pointerX - d.startX) >= DRAG_SLOP) {
+      d.moved = true
+    }
+
+    if (now - d.startTime >= HOLD_DELAY_MS) {
+      const velocity = edgeVelocity(d)
+      if (velocity !== 0) {
+        d.offset += velocity * dt
+        // Holding at an edge counts as a gesture too, so releasing there
+        // doesn't also toggle playback.
+        d.moved = true
+      }
+    }
+
+    if (d.moved) {
+      setScrubbing(true)
+      setPlaying(false)
+
+      let target = d.startIndex - (d.pointerX - d.startX) / PX_PER_WORD + d.offset
+
+      // Hitting either end bleeds the accumulated offset back off, so the
+      // text starts moving again the instant you reverse instead of first
+      // having to unwind however long you sat against the boundary.
+      const max = words.length - 1
+      if (target < 0) {
+        d.offset -= target
+        target = 0
+      } else if (target > max) {
+        d.offset -= target - max
+        target = max
+      }
+
+      setIndex(Math.round(target))
+    }
+
+    seekFrame.current = requestAnimationFrame(seekTick)
+  }
+
+  function onPointerDown(e: React.PointerEvent) {
+    // Capture means we keep getting move events even if the pointer
+    // leaves the element, so a fast drag doesn't just stop dead.
+    e.currentTarget.setPointerCapture(e.pointerId)
+
+    const rect = e.currentTarget.getBoundingClientRect()
+    const now = performance.now()
+    drag.current = {
+      startX: e.clientX,
+      startIndex: index,
+      pointerX: e.clientX,
+      centre: rect.left + rect.width / 2,
+      half: rect.width / 2,
+      offset: 0,
+      moved: false,
+      startTime: now,
+      lastFrame: now,
+    }
+
+    // The loop has to run even while the pointer is still, because edge
+    // acceleration is about *where* you're holding, not whether you move.
+    seekFrame.current = requestAnimationFrame(seekTick)
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    // Only records position — seekTick does all the work, on its own clock.
+    if (drag.current) drag.current.pointerX = e.clientX
+  }
+
+  function onPointerUp(e: React.PointerEvent) {
+    const d = drag.current
+    drag.current = null
+    cancelAnimationFrame(seekFrame.current)
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    setScrubbing(false)
+
+    // Never became a gesture, so it was a plain tap after all. A seek just
+    // leaves you parked on the new word, paused and ready to resume there.
+    if (d && !d.moved) toggle()
+  }
+
+  // Belt and braces: if this component goes away mid-gesture the loop
+  // would otherwise keep running against a dead component.
+  useEffect(() => () => cancelAnimationFrame(seekFrame.current), [])
+
   return (
     <div className="reader">
       <div className="progress" style={{ transform: `scaleX(${progress})` }} />
@@ -68,17 +240,26 @@ export function Reader({ book, onExit }: Props) {
         ←
       </button>
 
-      {/* The whole stage is the play/pause target, so no button competes
-          with the word for your attention while you're reading. */}
-      <div className="stage" onClick={toggle}>
+      {/* The whole stage is the play/pause and seek target, so no control
+          competes with the word for your attention while you're reading. */}
+      <div
+        className={`stage ${scrubbing ? 'stage-scrubbing' : ''}`}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
         {/* The two rules are a landing strip for your eye: they mark the
             fixed point the pivot letter always appears between. */}
         <div className="guide guide-top" />
         <Word word={words[index] ?? ''} />
         <div className="guide guide-bottom" />
+        {/* Only while stopped — surrounding text during playback would
+            pull your eye off the pivot, which is the one thing to avoid. */}
+        <ContextLine words={words} index={index} visible={!playing} />
       </div>
 
-      <div className="controls" onClick={(e) => e.stopPropagation()}>
+      <div className="controls">
         <input
           type="range"
           min={100}
@@ -92,7 +273,7 @@ export function Reader({ book, onExit }: Props) {
       </div>
 
       <div className={`hint ${playing ? 'hint-hidden' : ''}`}>
-        {atEnd ? 'tap to read again' : 'tap to ' + (playing ? 'pause' : 'start')}
+        {atEnd ? 'tap to read again' : 'tap to start · drag to seek'}
       </div>
     </div>
   )
