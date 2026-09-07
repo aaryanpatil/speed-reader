@@ -1,0 +1,295 @@
+/* ---------------------------------------------------------------------
+   Everything is driven by the handful of variables below. Change these
+   and the whole app changes; there are no other colours in the file.
+   --------------------------------------------------------------------- */
+
+:root {
+  --bg: #fbfbfa;
+  --fg: #1a1a1a;
+  --muted: #9a9a97;
+  --rule: #dedddb;
+  --accent: #d5372b; /* the pivot letter, and nothing else */
+
+  /* "Brisk": fast enough to feel immediate, slow enough to read as motion. */
+  --t: 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111110;
+    --fg: #ededea;
+    --muted: #6b6b68;
+    --rule: #2a2a28;
+    --accent: #ff6b5e;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* Screens ease in so navigation never feels like a hard cut. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* --- Upload ---------------------------------------------------------- */
+
+.upload {
+  display: grid;
+  justify-items: center;
+  gap: 1.5rem;
+  padding: 2rem;
+  animation: rise var(--t) both;
+}
+
+.drop {
+  width: min(80vw, 420px);
+  padding: 4rem 2rem;
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  border: 1px dashed var(--rule);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color var(--t), background var(--t), transform var(--t);
+}
+
+.drop:hover,
+.drop-active {
+  border-color: var(--fg);
+  transform: translateY(-2px);
+}
+
+.drop-active {
+  border-style: solid;
+}
+
+.drop-title {
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.parsing {
+  display: grid;
+  justify-items: center;
+  gap: 0.9rem;
+  width: min(80vw, 420px);
+}
+
+.parsing-bar {
+  width: 100%;
+  height: 2px;
+  background: var(--rule);
+  overflow: hidden;
+}
+
+/* Scaling a bar is cheaper for the browser than animating its width, so
+   the progress stays smooth even while the PDF is being chewed through. */
+.parsing-bar > div {
+  height: 100%;
+  background: var(--fg);
+  transform-origin: left;
+  transition: transform var(--t);
+}
+
+.error {
+  color: var(--accent);
+  font-size: 0.875rem;
+}
+
+.footnote {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* --- Reader ---------------------------------------------------------- */
+
+.reader {
+  position: relative;
+  width: 100vw;
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  place-items: center;
+  animation: rise var(--t) both;
+}
+
+.progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--fg);
+  transform-origin: left;
+  transition: transform var(--t) linear;
+}
+
+.exit {
+  position: fixed;
+  top: 1.25rem;
+  left: 1.25rem;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  opacity: 0.35;
+  transition: opacity var(--t);
+}
+
+.exit:hover {
+  opacity: 1;
+}
+
+.stage {
+  display: grid;
+  justify-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* The two rules and their ticks mark the fixed spot the pivot letter
+   always lands on. They give the eye something to rest against. */
+.guide {
+  position: relative;
+  width: min(90vw, 720px);
+  height: 1px;
+  background: var(--rule);
+}
+
+.guide::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 1px;
+  height: 9px;
+  background: var(--rule);
+  transform: translateX(-50%);
+}
+
+.guide-top::after {
+  top: 0;
+}
+
+.guide-bottom::after {
+  bottom: 0;
+}
+
+/* The heart of it: three columns, `1fr auto 1fr`. The middle column holds
+   the pivot letter and sits dead centre; the flexible columns either side
+   soak up the rest of the word. However long the word, that one letter
+   stays put — which is the whole point. */
+.word {
+  width: min(90vw, 720px);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  font-size: clamp(2rem, 7vw, 4rem);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  white-space: pre;
+}
+
+.word-before {
+  text-align: right;
+}
+
+.word-after {
+  text-align: left;
+}
+
+.word-pivot {
+  color: var(--accent);
+}
+
+/* Words swap instantly and on purpose. Any fade or slide between them
+   smears the text at speed and forces your eye to track movement, which
+   is exactly the work this technique exists to remove. Motion belongs on
+   the chrome, not on the word. */
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 2rem;
+  opacity: 0.3;
+  transition: opacity var(--t);
+}
+
+.controls:hover {
+  opacity: 1;
+}
+
+.wpm {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 5.5ch;
+}
+
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: min(60vw, 260px);
+  height: 1px;
+  background: var(--rule);
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--fg);
+  transition: transform var(--t);
+}
+
+input[type='range']:hover::-webkit-slider-thumb {
+  transform: scale(1.25);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--fg);
+}
+
+.hint {
+  position: fixed;
+  bottom: 5.5rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  transition: opacity var(--t);
+}
+
+/* Gets out of the way the moment you start reading. */
+.hint-hidden {
+  opacity: 0;
+}
