@@ -37,6 +37,7 @@
 }
 
 body {
+  overflow-x: hidden;
   background: var(--bg);
   color: var(--fg);
   font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -146,8 +147,10 @@ body {
   width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
+  /* One centred area, not two rows. The word belongs in the middle of
+     the screen; when the controls held a row of their own they pushed it
+     permanently above centre. They are pinned to the bottom instead. */
   display: grid;
-  grid-template-rows: 1fr auto;
   place-items: center;
   animation: rise var(--t) both;
 }
@@ -230,18 +233,25 @@ body {
   width: min(90vw, 720px);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
-  font-size: clamp(2rem, 7vw, 4rem);
+  /* Bigger on a phone than 7vw allowed: at 390px wide that floored out
+     at the 2rem minimum, which read as small at arm's length. */
+  font-size: clamp(2.6rem, 9.5vw, 4.25rem);
   font-weight: 400;
   letter-spacing: -0.01em;
   white-space: pre;
+  /* A word longer than the screen is clipped rather than allowed to
+     stretch the page. */
+  overflow: hidden;
 }
 
 .word-before {
   text-align: right;
+  min-width: 0;
 }
 
 .word-after {
   text-align: left;
+  min-width: 0;
 }
 
 .word-pivot {
@@ -267,6 +277,9 @@ body {
   font-size: 0.9375rem;
   color: var(--muted);
   white-space: nowrap;
+  /* The centre column sizes to its content, so a very long current word
+     could still push past the edges. Nothing here may escape. */
+  overflow: hidden;
   transition: opacity var(--t);
 }
 
@@ -277,6 +290,11 @@ body {
 .context-side {
   display: flex;
   overflow: hidden;
+  /* Grid items default to `min-width: auto`, meaning they refuse to
+     shrink below their content. With text set to nowrap, these columns
+     grew to fit the whole line and dragged the page wider than the
+     screen. Zero lets them be clipped as intended. */
+  min-width: 0;
 }
 
 /* Justifying to the far end makes the overflow spill — and therefore get
@@ -302,6 +320,10 @@ body {
 /* The controls and the timing panel move as one block, so opening the
    panel pushes nothing around and dimming applies to both together. */
 .chrome {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: grid;
   justify-items: center;
   gap: 0.9rem;
