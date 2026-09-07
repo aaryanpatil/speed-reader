@@ -112,6 +112,10 @@ export function stripRunningHeads(pages: Page[]): Page[] {
 export function cleanUp(text: string): string {
   return (
     text
+      // Some PDFs carry glyphs their font never mapped back to characters,
+      // which arrive as runs of nulls. They are invisible on screen but
+      // would be read out as words, so they go first.
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]+/g, '')
       // "informa-\ntion" was one word before the typesetter split it.
       .replace(/(\w)-\n(\w)/g, '$1$2')
       // A single newline is just the page's line wrap — it's still the
@@ -128,69 +132,91 @@ export function cleanUp(text: string): string {
 /* --- Where the book actually begins -----------------------------------
 
    A PDF opens with a title page, a copyright notice, a dedication and
-   usually a table of contents. None of that is worth reading one word at
-   a time, so we look for the first real heading and treat that as the
-   start.
+   usually a table of contents. None of it is worth reading one word at a
+   time.
 
-   The hard part is that a table of contents is *made of* headings. The
-   first "Chapter One" in a book is nearly always the contents entry, not
-   the chapter, so simply taking the first match lands you in the wrong
-   place almost every time. Three tests below separate a contents entry
-   from the real thing.
+   Looking for the word "Chapter" doesn't find the start, because plenty
+   of books don't use it — the one this was first tested against numbers
+   its chapters with a bare "1" — and a table of contents is itself made
+   of headings, so the first match is usually a contents entry anyway.
+
+   What separates front matter from the book is shape rather than
+   wording. Front matter is fragments: titles, names, a list of previous
+   works, contents entries. Body text is sustained full-measure lines,
+   paragraph after paragraph. So we find where that begins, then step
+   back over the few short lines that introduce it.
    --------------------------------------------------------------------- */
 
-const HEADINGS = [
-  /^(?:chapter|chap\.?)\s+(?:1|one|i)\b/i,
-  /^part\s+(?:1|one|i)\b/i,
-  /^(?:preface|prologue|introduction|foreword)\b/i,
-]
-
-/** Only look this far in; past it we'd be cutting real content. */
+/** Only look this far in; past it we would be cutting real content. */
 const FRONT_MATTER_LIMIT = 0.3
 
-function isHeading(text: string): boolean {
-  const t = text.trim()
-  if (!t || t.length > 60) return false
-  // A heading is a line of its own, at most a title and a subtitle. The
-  // word cap is what keeps a sentence that merely opens with one of these
-  // words — "Introduction to the theory of..." — from counting as one.
-  if (t.split(/\s+/).length > 8) return false
-  return HEADINGS.some((re) => re.test(t))
+/** A line long enough to be a full line of a paragraph rather than a fragment. */
+const FULL_LINE = 55
+
+/** How many consecutive lines to judge, and how many must be full. */
+const PROSE_WINDOW = 12
+const PROSE_SHARE = 0.75
+
+/** How far back from the prose to look for the heading that introduces it. */
+const HEADING_LOOKBACK = 6
+
+/**
+ * Lines that open a chapter. Only consulted just above where the prose
+ * starts, so these can afford to be loose — a bare number is meaningless
+ * on its own, but directly above a wall of prose it is a chapter number.
+ */
+const OPENINGS = [
+  /^\d{1,3}[.:]?$/,
+  /^(?:chapter|chap\.?|part|book)\s+\S+/i,
+  /^(?:preface|prologue|introduction|foreword|epilogue)\b/i,
+  /^(?:one|two|three|i{1,3})$/i,
+]
+
+/** The first line of sustained paragraph text. */
+function findProseStart(lines: string[]): number {
+  const limit = Math.floor(lines.length * FRONT_MATTER_LIMIT)
+  const needed = Math.ceil(PROSE_WINDOW * PROSE_SHARE)
+
+  for (let i = 0; i <= limit && i + PROSE_WINDOW <= lines.length; i++) {
+    let full = 0
+    for (let j = i; j < i + PROSE_WINDOW; j++) {
+      if (lines[j].trim().length >= FULL_LINE) full++
+    }
+    if (full >= needed) {
+      // The window allows a quarter of its lines to be short, so it can
+      // open a few lines before the prose actually does. Step forward to
+      // the first full line so the start is exact.
+      let j = i
+      while (j < lines.length && lines[j].trim().length < FULL_LINE) j++
+      return j
+    }
+  }
+  return 0
 }
 
 /** The index of the line the reader should open on, or 0 if unsure. */
 export function findContentStart(lines: string[]): number {
-  const limit = Math.floor(lines.length * FRONT_MATTER_LIMIT)
-  const marks: number[] = []
-  for (let i = 0; i < lines.length && i <= limit; i++) {
-    if (isHeading(lines[i])) marks.push(i)
-  }
+  const prose = findProseStart(lines)
+  if (prose === 0) return 0
 
-  for (const i of marks) {
+  // Between the contents and the first paragraph sit a handful of short
+  // lines — a chapter number, its title, sometimes a date and place. Walk
+  // back over them looking for the one that opens the chapter, and take
+  // the highest such line so the number is included along with the title.
+  let start = prose
+  for (let i = prose - 1; i >= 0 && prose - i <= HEADING_LOOKBACK; i--) {
     const line = lines[i].trim()
-
-    // 1. Contents entries carry the page they point at, usually behind a
-    //    row of dot leaders or a wide gap. Real headings cite no page.
-    //    Front matter is numbered in roman, so "Preface ..... ix" has to
-    //    be caught as readily as "Chapter One ..... 1".
-    if (/\.{2,}\s*[\divxlcdm]+$/i.test(line)) continue
-    if (/\s{2,}[\divxlcdm]+$/i.test(line)) continue
-    if (/\s\d{1,4}$/.test(line)) continue
-
-    // 2. Contents entries come in a crowd. A real chapter opening has
-    //    prose after it, not four more headings.
-    if (marks.filter((j) => j > i && j <= i + 30).length >= 3) continue
-
-    // 3. Whatever follows should actually read like a chapter.
-    const following = lines
-      .slice(i + 1, i + 40)
-      .join(' ')
-      .split(/\s+/)
-      .filter(Boolean).length
-    if (following < 120) continue
-
-    return i
+    // Another paragraph, so we were already inside the body text.
+    if (line.length >= FULL_LINE) break
+    // A contents entry cites the page it points at. Stop here, or a
+    // contents laid out close to the first chapter would pull us back
+    // into it — "Chapter Four ..... 78" reads as an opening otherwise.
+    if (/\.{2,}\s*[\divxlcdm]+$/i.test(line)) break
+    if (/\s{2,}[\divxlcdm]+$/i.test(line)) break
+    if (OPENINGS.some((re) => re.test(line))) start = i
   }
 
-  return 0
+  // Barely anything to skip means there was no front matter to speak of,
+  // and we'd only be dropping the title off the front of a paper.
+  return start < 3 ? 0 : start
 }
