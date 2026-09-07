@@ -124,3 +124,73 @@ export function cleanUp(text: string): string {
       .trim()
   )
 }
+
+/* --- Where the book actually begins -----------------------------------
+
+   A PDF opens with a title page, a copyright notice, a dedication and
+   usually a table of contents. None of that is worth reading one word at
+   a time, so we look for the first real heading and treat that as the
+   start.
+
+   The hard part is that a table of contents is *made of* headings. The
+   first "Chapter One" in a book is nearly always the contents entry, not
+   the chapter, so simply taking the first match lands you in the wrong
+   place almost every time. Three tests below separate a contents entry
+   from the real thing.
+   --------------------------------------------------------------------- */
+
+const HEADINGS = [
+  /^(?:chapter|chap\.?)\s+(?:1|one|i)\b/i,
+  /^part\s+(?:1|one|i)\b/i,
+  /^(?:preface|prologue|introduction|foreword)\b/i,
+]
+
+/** Only look this far in; past it we'd be cutting real content. */
+const FRONT_MATTER_LIMIT = 0.3
+
+function isHeading(text: string): boolean {
+  const t = text.trim()
+  if (!t || t.length > 60) return false
+  // A heading is a line of its own, at most a title and a subtitle. The
+  // word cap is what keeps a sentence that merely opens with one of these
+  // words — "Introduction to the theory of..." — from counting as one.
+  if (t.split(/\s+/).length > 8) return false
+  return HEADINGS.some((re) => re.test(t))
+}
+
+/** The index of the line the reader should open on, or 0 if unsure. */
+export function findContentStart(lines: string[]): number {
+  const limit = Math.floor(lines.length * FRONT_MATTER_LIMIT)
+  const marks: number[] = []
+  for (let i = 0; i < lines.length && i <= limit; i++) {
+    if (isHeading(lines[i])) marks.push(i)
+  }
+
+  for (const i of marks) {
+    const line = lines[i].trim()
+
+    // 1. Contents entries carry the page they point at, usually behind a
+    //    row of dot leaders or a wide gap. Real headings cite no page.
+    //    Front matter is numbered in roman, so "Preface ..... ix" has to
+    //    be caught as readily as "Chapter One ..... 1".
+    if (/\.{2,}\s*[\divxlcdm]+$/i.test(line)) continue
+    if (/\s{2,}[\divxlcdm]+$/i.test(line)) continue
+    if (/\s\d{1,4}$/.test(line)) continue
+
+    // 2. Contents entries come in a crowd. A real chapter opening has
+    //    prose after it, not four more headings.
+    if (marks.filter((j) => j > i && j <= i + 30).length >= 3) continue
+
+    // 3. Whatever follows should actually read like a chapter.
+    const following = lines
+      .slice(i + 1, i + 40)
+      .join(' ')
+      .split(/\s+/)
+      .filter(Boolean).length
+    if (following < 120) continue
+
+    return i
+  }
+
+  return 0
+}

@@ -17,6 +17,13 @@ export type Book = {
   text: string
   wordCount: number
   addedAt: number
+  /** Word the reader opens on, past the title and copyright pages. */
+  startWord: number
+}
+
+/** Books saved before startWord existed simply begin at the beginning. */
+function hydrate(book: Book): Book {
+  return { ...book, startWord: book.startWord ?? 0 }
 }
 
 export async function saveBook(book: Book): Promise<void> {
@@ -24,7 +31,8 @@ export async function saveBook(book: Book): Promise<void> {
 }
 
 export async function loadBook(id: string): Promise<Book | undefined> {
-  return get<Book>(id)
+  const book = await get<Book>(id)
+  return book && hydrate(book)
 }
 
 export async function deleteBook(id: string): Promise<void> {
@@ -34,5 +42,5 @@ export async function deleteBook(id: string): Promise<void> {
 /** Every saved book, newest first. */
 export async function listBooks(): Promise<Book[]> {
   const all = await values<Book>()
-  return all.sort((a, b) => b.addedAt - a.addedAt)
+  return all.map(hydrate).sort((a, b) => b.addedAt - a.addedAt)
 }

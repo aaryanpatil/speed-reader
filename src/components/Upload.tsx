@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { extractText, NoTextLayerError } from '../lib/pdf'
+import { parsePdf, NoTextLayerError } from '../lib/pdf'
 import { tokenize } from '../lib/words'
 import { saveBook, type Book } from '../lib/storage'
 
@@ -26,13 +26,14 @@ export function Upload({ onReady }: Props) {
     setProgress(0)
 
     try {
-      const text = await extractText(file, setProgress)
+      const { text, startWord } = await parsePdf(file, setProgress)
       const book: Book = {
         id: crypto.randomUUID(),
         title: file.name.replace(/\.pdf$/i, ''),
         text,
         wordCount: tokenize(text).length,
         addedAt: Date.now(),
+        startWord,
       }
       // Only the extracted text is kept. The PDF goes out of scope here
       // and the browser reclaims it.

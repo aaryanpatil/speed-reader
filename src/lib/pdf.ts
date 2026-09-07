@@ -11,7 +11,8 @@
  */
 import * as pdfjsLib from 'pdfjs-dist'
 import type { TextItem } from 'pdfjs-dist/types/src/display/api'
-import { cleanUp, stripRunningHeads, type Line, type Page } from './cleanup'
+import { cleanUp, findContentStart, stripRunningHeads, type Line } from './cleanup'
+import { tokenize } from './words'
 
 // pdf.js does its parsing in a Web Worker so the page never freezes.
 // Vite's `?url` suffix means "give me the final URL of this file after
@@ -26,18 +27,24 @@ export class NoTextLayerError extends Error {
   }
 }
 
+export type ParsedPdf = {
+  text: string
+  /** Word the reader should open on, skipping the front matter. */
+  startWord: number
+}
+
 /**
  * @param file    the PDF the user picked
  * @param onProgress called with 0..1 so the UI can show a progress bar
  */
-export async function extractText(
+export async function parsePdf(
   file: File,
   onProgress?: (fraction: number) => void,
-): Promise<string> {
+): Promise<ParsedPdf> {
   const bytes = await file.arrayBuffer()
   const pdf = await pdfjsLib.getDocument({ data: bytes }).promise
 
-  const pages: Page[] = []
+  const pages: { lines: Line[]; height: number }[] = []
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum)
     pages.push({
@@ -48,13 +55,21 @@ export async function extractText(
     onProgress?.(pageNum / pdf.numPages)
   }
 
-  const cleaned = cleanUp(joinPages(stripRunningHeads(pages)))
+  // Flattened to one run of lines, so a sentence running across a page
+  // break is rejoined rather than broken in two.
+  const lines = stripRunningHeads(pages).flatMap((page) => page.lines.map((line) => line.text))
+  const text = cleanUp(lines.join('\n'))
 
   // A handful of stray characters means the text layer was effectively
   // empty — i.e. a scan. Better to say so than to open an empty reader.
-  if (cleaned.length < 100) throw new NoTextLayerError()
+  if (text.length < 100) throw new NoTextLayerError()
 
-  return cleaned
+  // Cleaning the skipped part with the same function is what keeps this
+  // count aligned with how the reader will tokenise the whole text.
+  const startLine = findContentStart(lines)
+  const skipped = startLine === 0 ? '' : cleanUp(lines.slice(0, startLine).join('\n'))
+
+  return { text, startWord: skipped ? tokenize(skipped).length : 0 }
 }
 
 /**
@@ -87,8 +102,4 @@ function readLines(content: { items: unknown[] }): Line[] {
   if (text.trim()) lines.push({ text, y })
 
   return lines
-}
-
-function joinPages(pages: Page[]): string {
-  return pages.map((page) => page.lines.map((line) => line.text).join('\n')).join('\n\n')
 }

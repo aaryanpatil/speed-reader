@@ -52,7 +52,10 @@ export function Reader({ book, onExit }: Props) {
   // `useMemo` keeps it from re-running on every render.
   const words = useMemo(() => tokenize(book.text), [book.text])
 
-  const [index, setIndex] = useState(0)
+  // Opens past the front matter. Nothing is thrown away, though — seeking
+  // back before this point still reaches the title and copyright pages,
+  // which matters because the detection is a guess and can be wrong.
+  const [index, setIndex] = useState(book.startWord)
   const [playing, setPlaying] = useState(false)
   const [wpm, setWpm] = useState(300)
   const [scrubbing, setScrubbing] = useState(false)
@@ -95,8 +98,9 @@ export function Reader({ book, onExit }: Props) {
   const progress = words.length > 1 ? index / (words.length - 1) : 0
 
   function toggle() {
-    // Tapping play at the very end starts over rather than doing nothing.
-    if (atEnd && !playing) setIndex(0)
+    // Tapping play at the very end starts over rather than doing nothing —
+    // back to where the book began, not back into the copyright page.
+    if (atEnd && !playing) setIndex(book.startWord)
     setPlaying((p) => !p)
   }
 
