@@ -521,17 +521,77 @@ body {
 /* Centred, so it opens exactly where the word was. */
 .sheet {
   display: grid;
+  /* Head fixed, body takes what's left and scrolls within it. */
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 0.75rem;
   width: min(94vw, 400px);
   /* Landscape on a phone leaves very little height; scroll inside the
      sheet rather than letting it run off the screen. */
   max-height: 88dvh;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 1.1rem 1.2rem 1.25rem;
   background: var(--bg);
   border: 1px solid var(--rule);
   border-radius: 12px;
   animation: rise var(--t) both;
+}
+
+/* Registering these lets the fades ease in and out. Unregistered custom
+   properties can't be transitioned, so without this they would snap. */
+@property --fade-above {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --fade-below {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+/* The scroll now happens here rather than on .sheet itself. A scrollbar
+   is laid inside the border box, ignoring padding, so on the sheet it sat
+   flush against the rounded edge; on an inner element it lands inside the
+   sheet's padding, clear of the corner. */
+.sheet-body {
+  --fade-above: 0px;
+  --fade-below: 0px;
+
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  overflow-y: auto;
+  /* Keeps the text off the scrollbar when there is one. */
+  padding-right: 0.5rem;
+  margin-right: -0.25rem;
+
+  /* Content dissolves at an edge it can still be scrolled past, so a cut
+     line is never mistaken for the end of the text. Each side is zero
+     until there is actually something beyond it. */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--fade-above),
+    #000 calc(100% - var(--fade-below)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--fade-above),
+    #000 calc(100% - var(--fade-below)),
+    transparent 100%
+  );
+  transition: --fade-above var(--t), --fade-below var(--t);
+}
+
+.sheet-body.fade-above {
+  --fade-above: 2.25rem;
+}
+
+.sheet-body.fade-below {
+  --fade-below: 2.25rem;
 }
 
 .sheet-wide {
