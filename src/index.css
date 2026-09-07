@@ -9,6 +9,10 @@
   --muted: #9a9a97;
   --rule: #dedddb;
   --accent: #d5372b; /* the pivot letter, and nothing else */
+  --on: #a8d5b5; /* pastel green: rhythm engaged */
+  --on-fg: #123021;
+  --off: #4a4a48; /* dark grey: rhythm off */
+  --off-fg: #cfcfca;
 
   /* "Brisk": fast enough to feel immediate, slow enough to read as motion. */
   --t: 140ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -21,6 +25,8 @@
     --muted: #6b6b68;
     --rule: #2a2a28;
     --accent: #ff6b5e;
+    --on: #8fcaa4;
+    --on-fg: #0e2a1b;
   }
 }
 
@@ -285,17 +291,139 @@ body {
   color: var(--fg);
 }
 
+/* The controls and the timing panel move as one block, so opening the
+   panel pushes nothing around and dimming applies to both together. */
+.chrome {
+  display: grid;
+  justify-items: center;
+  gap: 0.9rem;
+  padding: 1.25rem 2rem 2rem;
+  transition: opacity var(--t);
+}
+
+/* Full strength whenever you're stopped — that is when these are read.
+   Only reading dims them, and hovering brings them straight back. */
+.chrome-dim {
+  opacity: 0.3;
+}
+
+.chrome-dim:hover,
+.chrome:focus-within {
+  opacity: 1;
+}
+
+/* --- Timing panel --- */
+
+.tuning {
+  display: grid;
+  gap: 0.55rem;
+  width: min(90vw, 370px);
+  padding: 1rem 1.1rem 1.1rem;
+  /* Opaque, so nothing shows through from behind it. */
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  transition: opacity var(--t);
+}
+
+/* Withdrawn while reading, the same way the hint is — faded rather than
+   removed, so the layout underneath the word never changes. */
+.tuning-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tuning-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.tuning-title {
+  font-size: 0.8125rem;
+  color: var(--fg);
+}
+
+/* Pushes reset to the far edge, away from the switch. */
+.tuning-reset {
+  margin-left: auto;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--muted);
+  transition: color var(--t);
+}
+
+.tuning-reset:hover {
+  color: var(--fg);
+}
+
+/* A filled pill rather than a word, so its state reads at a glance
+   without having to be parsed. */
+.switch {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.6rem;
+  min-width: 3rem;
+  border-radius: 999px;
+  transition: background var(--t), color var(--t);
+}
+
+.switch-on {
+  background: var(--on);
+  color: var(--on-fg);
+}
+
+.switch-off {
+  background: var(--off);
+  color: var(--off-fg);
+}
+
+/* Label, slider, reading — the same three columns on every row, so the
+   sliders line up however long the labels are. */
+.knob {
+  display: grid;
+  grid-template-columns: 6.75rem 1fr 5.25rem;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.knob input[type='range'] {
+  width: 100%;
+}
+
+.knob input[type='range']:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.knob-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+  color: var(--fg);
+}
+
+.knob input[type='range']:disabled ~ .knob-value {
+  color: var(--muted);
+}
+
 .controls {
   display: flex;
   align-items: center;
   gap: 0.9rem;
-  padding: 2rem;
-  opacity: 0.3;
-  transition: opacity var(--t);
-}
-
-.controls:hover {
-  opacity: 1;
 }
 
 .wpm {
@@ -336,10 +464,13 @@ input[type='range']::-moz-range-thumb {
 }
 
 .hint {
-  position: fixed;
-  bottom: 5.5rem;
+  /* In the flow above the word now, not floating over the controls where
+     it used to land on top of the timing panel. The reserved height is
+     what stops the word jumping when the hint fades. */
+  height: 1.1rem;
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
+  letter-spacing: 0.01em;
   transition: opacity var(--t);
 }
 

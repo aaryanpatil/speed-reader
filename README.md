@@ -31,6 +31,13 @@ holding that point still and sliding the word around it, your eye never
 has to move — which is what makes reading at speed possible rather than
 exhausting.
 
+**Timing.** Words don't all get the same time. Longer words hold longer,
+and a word ending a clause or a sentence gets a beat after it. The
+weights are relative and divided by their own average, so the words are
+redistributed against each other while the rate stays whatever you set —
+300 wpm really is 300 wpm. The two pauses are adjustable while paused,
+and the whole thing switches off to an even metronome.
+
 **Seeking.** Tap the stage to start or stop. Pausing reveals a line of
 surrounding text so you can see where you are. Press and drag to seek —
 you're dragging the text itself, so pulling right walks you backward.
@@ -52,11 +59,13 @@ src/
     Upload.tsx          drop zone and parsing progress
     Reader.tsx          the word timing loop and controls
     Word.tsx            one word, split around its pivot letter
+    ContextLine.tsx     the surrounding text, shown while paused
+    TimingPanel.tsx     the pause controls
 ```
 
 ## Not built yet
 
 - OCR fallback for scanned PDFs
-- Timing that varies by word length and punctuation
 - A library view for more than one book, with saved positions
+- Settings that survive a refresh
 - Keyboard controls

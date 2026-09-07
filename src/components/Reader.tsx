@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Word } from './Word'
 import { ContextLine } from './ContextLine'
-import { msPerWord, tokenize } from '../lib/words'
+import {
+  DEFAULT_TIMING,
+  FLAT_TIMING,
+  analyseWords,
+  msPerWord,
+  timingWeights,
+  tokenize,
+  type TimingOptions,
+} from '../lib/words'
+import { TimingPanel } from './TimingPanel'
 import type { Book } from '../lib/storage'
 
 /** How far you drag to move one word. Smaller = twitchier scrubbing. */
@@ -59,6 +68,18 @@ export function Reader({ book, onExit }: Props) {
   const [playing, setPlaying] = useState(false)
   const [wpm, setWpm] = useState(300)
   const [scrubbing, setScrubbing] = useState(false)
+  const [timing, setTiming] = useState<TimingOptions>(DEFAULT_TIMING)
+  const [rhythm, setRhythm] = useState(true)
+
+  // Reading each word is the expensive half and depends only on the book.
+  const shapes = useMemo(() => analyseWords(words), [words])
+
+  // Turning those readings into weights is arithmetic, so it can rerun on
+  // every frame of a slider drag without the settings feeling sticky.
+  const weights = useMemo(
+    () => timingWeights(shapes, rhythm ? timing : FLAT_TIMING),
+    [shapes, rhythm, timing],
+  )
 
   // The animation loop below is set up once and then runs for a while, so
   // it can't read `wpm` directly — it would capture whatever the value was
@@ -68,22 +89,39 @@ export function Reader({ book, onExit }: Props) {
   const wpmRef = useRef(wpm)
   wpmRef.current = wpm
 
+  // Lets the loop pick up wherever a seek left us when playback resumes.
+  const indexRef = useRef(index)
+  indexRef.current = index
+
+  // Read through a ref for the same reason as the rate: adjusting timing
+  // mid-sentence should take effect on the next word, not tear down and
+  // restart the loop underneath you.
+  const weightsRef = useRef(weights)
+  weightsRef.current = weights
+
   useEffect(() => {
     if (!playing) return
 
     let frame = 0
     let lastFlip = performance.now()
+    // Its own cursor, seeded from wherever we are now. The loop has to
+    // know which word is showing in order to time *that* word, and a
+    // state update won't have landed by the next frame.
+    let at = indexRef.current
 
     const tick = (now: number) => {
-      if (now - lastFlip >= msPerWord(wpmRef.current)) {
+      // A word of average weight gets exactly the chosen rate; the rest
+      // borrow and lend around it.
+      const dwell = msPerWord(wpmRef.current) * (weightsRef.current[at] ?? 1)
+
+      if (now - lastFlip >= dwell) {
         lastFlip = now
-        setIndex((i) => {
-          if (i + 1 >= words.length) {
-            setPlaying(false)
-            return i
-          }
-          return i + 1
-        })
+        at += 1
+        if (at >= words.length) {
+          setPlaying(false)
+          return
+        }
+        setIndex(at)
       }
       frame = requestAnimationFrame(tick)
     }
@@ -253,6 +291,13 @@ export function Reader({ book, onExit }: Props) {
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
+        {/* Above the word, where there is nothing else to collide with.
+            Its height is always reserved, so the word doesn't shift when
+            the hint fades away. */}
+        <div className={`hint ${playing ? 'hint-hidden' : ''}`}>
+          {atEnd ? 'tap to read again' : 'tap to start · drag to seek'}
+        </div>
+
         {/* The two rules are a landing strip for your eye: they mark the
             fixed point the pivot letter always appears between. */}
         <div className="guide guide-top" />
@@ -263,21 +308,36 @@ export function Reader({ book, onExit }: Props) {
         <ContextLine words={words} index={index} visible={!playing} />
       </div>
 
-      <div className="controls">
-        <input
-          type="range"
-          min={100}
-          max={1000}
-          step={25}
-          value={wpm}
-          onChange={(e) => setWpm(Number(e.target.value))}
-          aria-label="Words per minute"
-        />
-        <span className="wpm">{wpm} wpm</span>
-      </div>
+      <div className={`chrome ${playing ? 'chrome-dim' : ''}`}>
+        {/* Rate sits nearest the word, being the control reached for most;
+            the timing panel opens underneath it. */}
+        <div className="controls">
+          <input
+            type="range"
+            min={100}
+            max={1000}
+            step={25}
+            value={wpm}
+            onChange={(e) => setWpm(Number(e.target.value))}
+            aria-label="Words per minute"
+          />
+          <span className="wpm">{wpm} wpm</span>
+        </div>
 
-      <div className={`hint ${playing ? 'hint-hidden' : ''}`}>
-        {atEnd ? 'tap to read again' : 'tap to start · drag to seek'}
+        {/* Always mounted, faded out while reading. Unmounting it would
+            shrink the chrome and shift the word down mid-sentence, which
+            is the one thing that must never move. */}
+        <TimingPanel
+          timing={timing}
+          onChange={setTiming}
+          rhythm={rhythm}
+          onRhythmChange={setRhythm}
+          onReset={() => {
+            setTiming(DEFAULT_TIMING)
+            setRhythm(true)
+          }}
+          hidden={playing}
+        />
       </div>
     </div>
   )
