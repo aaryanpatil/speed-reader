@@ -56,7 +56,7 @@ export function Upload({ onReady }: Props) {
       <button
         className="info"
         onClick={() => setAbout(true)}
-        aria-label="Why one word at a time"
+        aria-label="How It Works"
       >
         <svg viewBox="0 0 16 16" width="17" height="17" aria-hidden="true">
           <circle cx="8" cy="8" r="6.6" />

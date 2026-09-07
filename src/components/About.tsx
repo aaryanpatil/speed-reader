@@ -6,7 +6,7 @@ import { Sheet } from './Sheet'
  */
 export function About({ onClose }: { onClose: () => void }) {
   return (
-    <Sheet title="Why one word at a time" onClose={onClose} wide>
+    <Sheet title="How It Works" onClose={onClose} wide>
       <div className="prose">
         <p>
           Reading normally, your eyes don't glide along a line. They jump, land,
